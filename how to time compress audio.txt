@@ -1,0 +1,39 @@
+python audio_skippy.py -i "input.wav" -o "output_timecompressed.wav" --target-ratio 1.0198 (change to your desired time)
+
+if you want to change how frequent your audio jumps (that skippy time compression you hear on tbs), i recommend copying and pasting this directly into cmd
+
+python audio_skippy.py ^
+ -i "input.wav" ^
+ -o "output_compress.wav" ^ 
+ --target-ratio **** ^
+ --frame-ms 15 ^
+ --max-chop-ms 35 ^
+ --cadence-ms 250 ^
+ --crossfade-ms 6 ^
+ --energy-quantile 0.5
+
+just increase or decrease some of these, but if you want to be safe, keep it like this
+
+say for example you want it just a bit lighter
+
+python audio_skippy.py ^
+ -i "input.wav" ^
+ -o "output_light.wav" ^ 
+ --target-ratio **** ^
+ --frame-ms 20 ^
+ --max-chop-ms 25 ^
+ --cadence-ms 300 ^
+ --crossfade-ms 8 ^
+ --energy-quantile 0.4
+
+but if you want it heavier (more accurate to tbs)
+
+python audio_skippy.py ^
+ -i "input.wav" ^
+ -o "output_heavy.wav" ^ 
+ --target-ratio **** ^
+ --frame-ms 10 ^
+ --max-chop-ms 45 ^
+ --cadence-ms 180 ^
+ --crossfade-ms 4 ^
+ --energy-quantile 0.6
