@@ -1,0 +1,5 @@
+*.wav
+*.mp4
+*.npy
+*.log
+*_markers.txt
