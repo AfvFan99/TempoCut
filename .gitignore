@@ -1,5 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+env/
+venv/
+.env
+
+# Media & large artifacts
 *.wav
 *.mp4
 *.npy
-*.log
 *_markers.txt
+
+# OS junk
+.DS_Store
+Thumbs.db
