@@ -17,7 +17,7 @@ The audio engine is designed to sound very close to the Turner “skippy” styl
 
 - Broadcast-accurate time compression for **audio + video**
 - Multiple audio “skippy” modes with marker export for Premiere Pro
-- 59.94p output with micro-smear blending to reduce judder
+- 29.97p or 59.94p output with micro-smear blending to reduce judder
 - Saves DTW warp map for **subtitle** retiming
 - Windows batch pipeline for one-click runs
 
@@ -68,7 +68,7 @@ Now retime the video to match the skippy audio.
 python time_compressor_SAFE.py -i "input.mp4" -s "output.wav" -o "out_59p.mp4"
 ```
 
-- Output is 59.94p video with micro-smear blending (to hide jumps).
+- Output is 29.97p or 59.94p video with micro-smear blending (to hide jumps).
 - A warp map file `map_t_skip_to_t_orig.npy` is also created — you’ll need it if you want subtitles.
 
 ---
