@@ -30,14 +30,14 @@ set FINAL_SUBS="output_final.srt"
 
 REM === STEP 1: Python compressor (59.94p with smears) ===
 echo 🔹 Step 1: Python compressor @59.94p...
-python "%PYTHON_SCRIPT%" -i %INPUT_VIDEO% -s %INPUT_AUDIO% -o %TEMP_OUTPUT%
+python %PYTHON_SCRIPT% -i %INPUT_VIDEO% -s %INPUT_AUDIO% -o %TEMP_OUTPUT%
 if errorlevel 1 (
     echo ❌ Python compressor failed.
     pause & exit /b
 )
 
-REM === STEP 2: Mux 5.1 audio ===
-echo 🔹 Step 2: Muxing 5.1 audio...
+REM === STEP 2: Mux audio ===
+echo 🔹 Step 2: Muxing audio...
 ffmpeg -y -i %TEMP_OUTPUT% -i %INPUT_AUDIO% -map 0:v -map 1:a ^
   -c:v copy -c:a aac -b:a 512k %FINAL_OUTPUT%
 if errorlevel 1 (
@@ -45,10 +45,10 @@ if errorlevel 1 (
     pause & exit /b
 )
 
-REM === STEP 3: Retiming subtitles (new retime_subs.py) ===
+REM === STEP 3: Retiming subtitles ===
 if exist %INPUT_SUBS% (
     echo 🔹 Step 3: Retiming subtitles with warp map...
-    python "%RETIME_SCRIPT%" "%MAP_FILE%" %INPUT_SUBS% %FINAL_SUBS%
+    python %RETIME_SCRIPT% %MAP_FILE% %INPUT_SUBS% %FINAL_SUBS%
     if errorlevel 1 (
         echo ⚠️ retime_subs.py failed, falling back to ffsubsync...
         ffsubsync %FINAL_OUTPUT% --sub %INPUT_SUBS% -o %FINAL_SUBS%
