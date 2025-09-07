@@ -1,0 +1,6 @@
+numpy<2.0
+soundfile
+moviepy==1.0.5
+librosa
+tqdm
+pysrt

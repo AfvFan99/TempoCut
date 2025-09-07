@@ -1,0 +1,2 @@
+[console_scripts]
+tempocut = tempo_cut.cli:main
