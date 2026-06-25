@@ -7,173 +7,96 @@ _Not affiliated with Warner Bros. Discovery or Prime Image. Educational use only
 
 ## 📖 Overview
 
-**TempoCut** is a Python toolkit that mimics professional broadcast time compression systems (e.g., Prime Image Time Tailor). It shortens shows to fit time slots while keeping **tight A/V sync**.
+**TempoCut** is a Windows desktop app that mimics professional broadcast time compression systems (e.g., Prime Image Time Tailor). It shortens shows to fit time slots while keeping **exact A/V sync**.
 
-The audio engine is designed to sound very close to the Turner “skippy” style with minimal artifacts, while the video is retimed to match (59.94p output with subtle smears). Subtitle alignment is handled automatically via DTW warp maps.
+As of v1.2, TempoCut uses a cut-based architecture: instead of continuously retiming video to approximately match time-compressed audio, it analyzes the *original* audio waveform and video frames together to find genuinely redundant moments — points where both audio is quiet and video is visually static — and removes matching, exact-length windows from both simultaneously. Sync is guaranteed by construction, not computed after the fact.
 
 ---
 
 ## ✨ Features
 
-- Broadcast-accurate time compression for **audio + video**
-- Multiple audio “skippy” modes with marker export for Premiere Pro
-- 29.97p or 59.94p output with micro-smear blending to reduce judder
-- Saves DTW warp map for **subtitle** retiming
-- Windows batch pipeline for one-click runs
+- **Joint audio + video redundancy detection** — cuts only land where both audio *and* video are redundant, not audio energy alone
+- **Exact sync** — output duration is derived from one continuous, exact time map, not accumulated per-cut rounding
+- **Subframe blending at cuts**, with a **Blend Amount** control (Full / Medium / Light / None, or a fine slider) — choose how gradual each cut transition feels, from a continuous Premiere-style blend down to a hard snap
+- **Genuine 23.976 → 29.97 pulldown** — real frame duplication via re-encode, not interpolation, applied before any cutting happens
+- **Self-contained install** — bundles its own Python runtime and ffmpeg; nothing else to install
+- **Subtitle retiming** via the same exact cut map (no approximation)
+- **Multichannel (5.1) and stereo** audio support
 
 ---
 
-## 🛠 Requirements
+## 🚀 Quick Start (Windows app)
+
+1. Download the latest installer from [Releases](../../releases)
+2. Run it — no Python, no ffmpeg, nothing else to install
+3. Open TempoCut, load your video, set your target compression ratio, hit **Create Job**
+
+That's it for typical use. Everything below is for advanced/command-line use of the underlying engine.
+
+---
+
+## 🛠 Advanced: Running the Scripts Directly
 
 **Python:** 3.10+
 
-**Install tools & libs**
 ```bash
 pip install -r requirements.txt
 ```
 
-**Also required**
-- **FFmpeg** in your PATH (for I/O and muxing)
-- (Optional) **ffsubsync** CLI in PATH if you want the batch script’s subtitle fallback
+**Also required:** FFmpeg in your PATH.
 
----
-
-## 🚀 Usage
-
-TempoCut has three main stages: **audio compression**, **video retiming**, and **subtitle alignment**. You can run them individually or together with the provided batch script.
-
-### 1. Audio Compression
-
-Choose stereo or surround based on your source.
-
-**Stereo**
-```bash
-python audio_skippy_STEREO.py -i "input.wav" -o "output.wav" --target-ratio 1.02
-```
-
-**Surround (5.1 WAV)**
-```bash
-python audio_skippy_SURROUND.py -i "input.wav" -o "output.wav" --target-ratio 1.02
-```
-
-👉 This step creates both the compressed audio file **and** a `*_markers.txt` file listing “skippy” points, which you can import into Premiere Pro.
-
----
-
-### 2. Video Retime
-
-Now retime the video to match the skippy audio.
+### 1. Audio Redundancy Detection + Compression
 
 ```bash
-python time_compressor_SAFE.py -i "input.mp4" -s "output.wav" -o "out_59p.mp4"
+python audio_skippy_SURROUND.py -i "input.wav" -o "output.wav" --target-ratio 1.02 --video "input.mp4"
 ```
 
-- Output is 29.97p or 59.94p video with micro-smear blending (to hide jumps).
-- A warp map file `map_t_skip_to_t_orig.npy` is also created — you’ll need it if you want subtitles.
+`--video` enables joint audio+video redundancy detection (recommended) — omit it to fall back to audio-only detection. This step produces:
+- The compressed audio file
+- A `*_markers.txt` file (human-readable cut points, importable into Premiere Pro)
+- A `*_cutlist.csv` file (exact, machine-readable cut windows — this is what the video step actually uses)
 
----
-
-### 3. Subtitle Alignment
-
-If you have subtitles, retime them using the warp map:
+### 2. Video Cutting
 
 ```bash
-python retime_subs.py map_t_skip_to_t_orig.npy input.srt output.srt
+python time_compressor_CUTLIST.py -i "input.mp4" --cutlist "input_cutlist.csv" -o "output.mp4" --blend-width 0.33
 ```
 
-This adjusts every subtitle cue to stay in sync with the new compressed video.
+`--blend-width` ranges 0 (hard cut) to 1 (full continuous blend); default 0.33. Output video has no audio track yet — mux it with the compressed audio from step 1 using ffmpeg.
 
----
+A `map_t_skip_to_t_orig.npy` warp map is also saved alongside the output, for subtitle retiming.
 
-### 4. One-Click Workflow (Windows)
+### 3. Subtitle Retiming
 
-Edit the paths inside:
-```bat
-time_compressor_pipeline.bat
-```
-
-Then run it. It will:
-1. Retime video  
-2. Mux audio  
-3. Retime subs (or fall back to `ffsubsync`)  
-4. Clean up temp files  
-
----
-
-## 🎚️ Audio Compression Modes
-
-**Basic usage**
 ```bash
-python audio_skippy.py -i "input.wav" -o "output_timecompressed.wav" --target-ratio 1.0198
+python subtitle_retime.py -i input.srt -o output.srt -m map_t_skip_to_t_orig.npy
 ```
-*(Change `--target-ratio` to your desired total compression.)*
-
-**Advanced usage (classic “skippy” cadence)**
-```bat
-python audio_skippy.py ^
- -i "input.wav" ^
- -o "output_compress.wav" ^
- --target-ratio **** ^
- --frame-ms 15 ^
- --max-chop-ms 35 ^
- --cadence-ms 250 ^
- --crossfade-ms 6 ^
- --energy-quantile 0.5
-```
-
-**Lighter compression (smoother)**
-```bat
-python audio_skippy.py ^
- -i "input.wav" ^
- -o "output_light.wav" ^
- --target-ratio **** ^
- --frame-ms 20 ^
- --max-chop-ms 25 ^
- --cadence-ms 300 ^
- --crossfade-ms 8 ^
- --energy-quantile 0.4
-```
-
-**Heavier compression (more TBS-like “skips”)**
-```bat
-python audio_skippy.py ^
- -i "input.wav" ^
- -o "output_heavy.wav" ^
- --target-ratio **** ^
- --frame-ms 10 ^
- --max-chop-ms 45 ^
- --cadence-ms 180 ^
- --crossfade-ms 4 ^
- --energy-quantile 0.6
-```
-
-**Tips**
-- `--target-ratio` ≈ total shortening (e.g., `1.02` ≈ 2% shorter).
-- Smaller `--frame-ms`/`--cadence-ms` = tighter sync, more obvious “skips”.
-- Larger values = smoother, lighter compression.
-- Keep ratios under **1.05** for natural sound.
-- For 5.1, use `audio_skippy_SURROUND.py`.
 
 ---
 
-## ⚠️ Known Issues & Workarounds
+## 🎚️ Audio Compression Tuning
 
-- **Brief freeze at start** if the first audio/video frames are silent/black.  
-  *Workaround:* Trim a tiny leading sliver (100–300 ms) before processing.
-- **Occasional mid-video frame pauses** if off-by-one sync drift appears.  
-  *Workaround:* Try a larger `--frame-ms` or gentler `--target-ratio` on audio.
-- **Library compatibility**  
-  Pinned: `moviepy==1.0.5`, `numpy<2.0`.
+| Parameter | Effect |
+|---|---|
+| `--target-ratio` | Total shortening (e.g. `1.02` ≈ 2% shorter) |
+| `--frame-ms` | Analysis frame size — smaller = tighter sync, more frequent cuts |
+| `--max-chop-ms` | Maximum length of any single removed window |
+| `--cadence-ms` | Minimum spacing between cuts |
+| `--crossfade-ms` | Crossfade duration at each cut |
+| `--energy-quantile` | How quiet a moment must be to qualify (lower = stricter) |
+| `--video-motion-quantile` | How static a moment must be to qualify (lower = stricter; only used with `--video`) |
+
+Keep `--target-ratio` under **1.05** for natural-sounding results. Requiring both audio *and* video redundancy is inherently more conservative than audio alone — if there aren't enough jointly-redundant moments in the source, the achieved ratio may fall short of the target. This is expected, not a bug.
 
 ---
 
 ## 📂 Scripts in this repo
 
-- `audio_skippy_STEREO.py` – stereo micro-skip engine + Premiere markers
-- `audio_skippy_SURROUND.py` – multichannel/5.1 micro-skip engine + markers
-- `time_compressor_SAFE.py` – DTW-based video retime to skippy audio (59.94p + smears) and saves warp map
-- `retime_subs.py` – retimes SRTs via the saved warp map
-- `time_compressor_pipeline.bat` – Windows pipeline for the whole flow
+- `tempocut_v2.py` – the GUI application
+- `audio_skippy_SURROUND.py` – joint audio+video redundancy detection and audio time compression, multichannel/5.1
+- `time_compressor_CUTLIST.py` – exact cut-based video compression with subframe blending at cut points
+- `subtitle_retime.py` – retimes SRTs via the exact cut map
+- `tempocut.spec` / `TempoCut.iss` – build files for the installer
 
 ---
 
