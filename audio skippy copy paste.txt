@@ -1,11 +1,11 @@
 cd to Final Time Compressor Draft
 
-python audio_skippy_SURROUND.py ^
- -i "D:\SBS2025 Prints\AFHV2120.wav" ^
- -o "D:\SBS2025 Prints\AFHV2120_light.wav" ^
- --target-ratio 1.0229 ^
- --frame-ms 20 ^
- --max-chop-ms 25 ^
- --cadence-ms 300 ^
- --crossfade-ms 8 ^
- --energy-quantile 0.4
+python audio_skippy_EXTEND.py ^
+ -i "D:\SDC\Masters\SDC_S43E01_SYND_MASTER_V1_20260410.wav" ^
+ -o "D:\SDC\Masters\SDC_S43E01_SYND_MASTER_V1_wgn.wav" ^
+ --target-ratio 0.9929 ^
+ --frame-ms 15 ^
+ --max-chop-ms 35 ^
+ --cadence-ms 250 ^
+ --crossfade-ms 6 ^
+ --energy-quantile 0.5
