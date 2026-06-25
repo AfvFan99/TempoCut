@@ -1,0 +1,11 @@
+cd to Final Time Compressor Draft
+
+python audio_skippy_SURROUND.py ^
+ -i "D:\SBS2025 Prints\AFHV2120.wav" ^
+ -o "D:\SBS2025 Prints\AFHV2120_light.wav" ^
+ --target-ratio 1.0229 ^
+ --frame-ms 20 ^
+ --max-chop-ms 25 ^
+ --cadence-ms 300 ^
+ --crossfade-ms 8 ^
+ --energy-quantile 0.4

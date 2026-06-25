@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tempocut"
+version = "0.1.1"
+description = "Broadcast-style A/V time compression (skippy audio, DTW video, subtitle retiming)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{ name = "AfvFan99" }]
+dependencies = [
+  "numpy<2.0",
+  "soundfile",
+  "moviepy==1.0.5",
+  "librosa",
+  "tqdm",
+  "pysrt"
+]
+
+[project.scripts]
+tempocut = "tempo_cut.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["tempo_cut"]
+include-package-data = true

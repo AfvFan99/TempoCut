@@ -1,0 +1,4 @@
+cd to Final Time Compressor Draft
+
+python "C:\Users\Owner\Final Time Compressor Draft\subtitle_retime.py" ^ -m "D:\SBS2025 Prints\map_t_skip_to_t_orig.npy" ^ -i "D:\SBS2025 Prints\AFHV2122.mp4.srt" ^ -o "D:\SBS2025 Prints\AFHV2122_FINAL.srt"
+
