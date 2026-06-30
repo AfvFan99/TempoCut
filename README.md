@@ -1,105 +1,143 @@
 # TempoCut
 
-**Broadcast-style video & audio time compression — recreate the classic “time tailoring” used by TBS, TNT, TruTV, Cartoon Network, and Adult Swim.**  
-_Not affiliated with Warner Bros. Discovery or Prime Image. Educational use only._
+**Broadcast-style video & audio time compression — recreate the classic "time tailoring" used by TBS, TNT, TruTV, Cartoon Network, and Adult Swim.**
+*Not affiliated with Warner Bros. Discovery or Prime Image. Educational use only.*
 
 ---
 
-## 📖 Overview
+## Overview
 
-**TempoCut** is a Windows desktop app that mimics professional broadcast time compression systems (e.g., Prime Image Time Tailor). It shortens shows to fit time slots while keeping **exact A/V sync**.
+TempoCut is a Python toolkit (with a full PyQt5 GUI) that mimics professional broadcast time compression systems like Prime Image's Time Tailor. It shortens video to fit a target time slot while keeping tight A/V sync, using a redundancy-based "skippy" approach: short, low-energy/low-motion moments are found in the audio and video and either cut out entirely or sped through, rather than uniformly speeding up the whole timeline.
 
-As of v1.2, TempoCut uses a cut-based architecture: instead of continuously retiming video to approximately match time-compressed audio, it analyzes the *original* audio waveform and video frames together to find genuinely redundant moments — points where both audio is quiet and video is visually static — and removes matching, exact-length windows from both simultaneously. Sync is guaranteed by construction, not computed after the fact.
+The audio engine analyzes 5.1/stereo audio for quiet, redundant moments using joint audio+video motion detection, producing an exact cut list. Video compression then has **two selectable modes** built on that same cut list:
 
----
+- **Cut mode** — removes each redundant window entirely, with a crossfade at the cut boundary. This is the classic Time Tailor approach: sparse, exact cuts with a brief blend right at the seam.
+- **Blend-Through mode** — never deletes a frame. Instead, it plays faster through each redundant window by cross-blending neighboring frames (the "1 2 3 [blend] 1 2 [blend]" cadence), which can look smoother on some content. Automatically widens windows when needed to guarantee enough room for the blend to be visible and to hit the requested duration exactly, even when the natural redundancy found is smaller than the requested compression.
 
-## ✨ Features
-
-- **Joint audio + video redundancy detection** — cuts only land where both audio *and* video are redundant, not audio energy alone
-- **Exact sync** — output duration is derived from one continuous, exact time map, not accumulated per-cut rounding
-- **Subframe blending at cuts**, with a **Blend Amount** control (Full / Medium / Light / None, or a fine slider) — choose how gradual each cut transition feels, from a continuous Premiere-style blend down to a hard snap
-- **Genuine 23.976 → 29.97 pulldown** — real frame duplication via re-encode, not interpolation, applied before any cutting happens
-- **Self-contained install** — bundles its own Python runtime and ffmpeg; nothing else to install
-- **Subtitle retiming** via the same exact cut map (no approximation)
-- **Multichannel (5.1) and stereo** audio support
+Subtitle alignment retimes SRT/STL/SCC cues to stay in sync with the compressed timeline.
 
 ---
 
-## 🚀 Quick Start (Windows app)
+## Features
 
-1. Download the latest installer from [Releases](../../releases)
-2. Run it — no Python, no ffmpeg, nothing else to install
-3. Open TempoCut, load your video, set your target compression ratio, hit **Create Job**
-
-That's it for typical use. Everything below is for advanced/command-line use of the underlying engine.
+- Broadcast-accurate time compression for **audio + video**, with joint audio+video redundancy detection (cuts only land where both audio is quiet *and* video is visually static)
+- Two video compression modes: **Cut** (classic hard-cut + crossfade) and **Blend-Through** (frame-blended speed-through, nothing dropped)
+- Five built-in Skippy presets (Gentle, Light, Balanced, Heavy, Extreme) plus a continuous **Auto** mode that tunes parameters smoothly across the full range, or full manual control
+- Exact-sync guarantee: video duration is computed directly from audio's true (crossfade-inclusive) duration reduction — no DTW re-discovery, no drift
+- Full PyQt5 GUI (`tempocut_v2.py`) with live progress bars, a render-position scrubber, pause/resume, and an Editor tab for trim/color/audio gain before compression
+- Subtitle retiming via exact warp maps
+- Windows installer build (PyInstaller + Inno Setup)
 
 ---
 
-## 🛠 Advanced: Running the Scripts Directly
+## Requirements
 
 **Python:** 3.10+
 
-```bash
+```
 pip install -r requirements.txt
 ```
 
-**Also required:** FFmpeg in your PATH.
+**Also required:**
+- **FFmpeg** and **ffprobe** in your PATH (or bundled alongside the built `.exe`)
 
-### 1. Audio Redundancy Detection + Compression
+---
 
-```bash
+## Usage
+
+### GUI (recommended)
+
+```
+python tempocut_v2.py
+```
+
+Load a video in the **Job** tab, choose a Skippy preset and Target Ratio in **Compression**, pick **Cut** or **Blend-Through** mode in **Frame Blend**, and hit Run. Progress, including a render-position scrubber, is shown live in the **Log / Progress** tab.
+
+### Command-line / scripted pipeline
+
+TempoCut's pipeline has three stages, each runnable standalone:
+
+**1. Audio compression** — finds redundant windows and writes the exact cut list:
+
+```
 python audio_skippy_SURROUND.py -i "input.wav" -o "output.wav" --target-ratio 1.02 --video "input.mp4"
 ```
 
-`--video` enables joint audio+video redundancy detection (recommended) — omit it to fall back to audio-only detection. This step produces:
-- The compressed audio file
-- A `*_markers.txt` file (human-readable cut points, importable into Premiere Pro)
-- A `*_cutlist.csv` file (exact, machine-readable cut windows — this is what the video step actually uses)
+This produces `output_cutlist.csv` (exact start/end/crossfade per cut, used by both video modes below) and a `*_markers.txt` file for reference in an NLE.
 
-### 2. Video Cutting
+**2. Video compression** — pick one mode:
 
-```bash
-python time_compressor_CUTLIST.py -i "input.mp4" --cutlist "input_cutlist.csv" -o "output.mp4" --blend-width 0.33
+Cut mode (hard cut + boundary crossfade):
+```
+python time_compressor_CUTLIST.py -i "input.mp4" --cutlist "output_cutlist.csv" -o "out.mp4" --blend-width 0.33
 ```
 
-`--blend-width` ranges 0 (hard cut) to 1 (full continuous blend); default 0.33. Output video has no audio track yet — mux it with the compressed audio from step 1 using ffmpeg.
+Blend-Through mode (frame-blended speed-through, nothing dropped):
+```
+python time_compressor_BLENDTHROUGH.py -i "input.mp4" --cutlist "output_cutlist.csv" -o "out.mp4" --window-blend 0.75 --audio-duration 81.84
+```
 
-A `map_t_skip_to_t_orig.npy` warp map is also saved alongside the output, for subtitle retiming.
+**3. Subtitle alignment** (optional) — retimes SRT/STL/SCC cues using the warp map produced by either video script above:
 
-### 3. Subtitle Retiming
-
-```bash
-python subtitle_retime.py -i input.srt -o output.srt -m map_t_skip_to_t_orig.npy
+```
+python subtitle_retime.py map_t_skip_to_t_orig.npy input.srt output.srt
 ```
 
 ---
 
-## 🎚️ Audio Compression Tuning
+## Audio Compression Parameters
 
-| Parameter | Effect |
-|---|---|
-| `--target-ratio` | Total shortening (e.g. `1.02` ≈ 2% shorter) |
-| `--frame-ms` | Analysis frame size — smaller = tighter sync, more frequent cuts |
-| `--max-chop-ms` | Maximum length of any single removed window |
-| `--cadence-ms` | Minimum spacing between cuts |
-| `--crossfade-ms` | Crossfade duration at each cut |
-| `--energy-quantile` | How quiet a moment must be to qualify (lower = stricter) |
-| `--video-motion-quantile` | How static a moment must be to qualify (lower = stricter; only used with `--video`) |
+```
+python audio_skippy_SURROUND.py ^
+ -i "input.wav" ^
+ -o "output.wav" ^
+ --target-ratio 1.02 ^
+ --frame-ms 15 ^
+ --max-chop-ms 35 ^
+ --cadence-ms 250 ^
+ --crossfade-ms 6 ^
+ --energy-quantile 0.5 ^
+ --video "input.mp4"
+```
 
-Keep `--target-ratio` under **1.05** for natural-sounding results. Requiring both audio *and* video redundancy is inherently more conservative than audio alone — if there aren't enough jointly-redundant moments in the source, the achieved ratio may fall short of the target. This is expected, not a bug.
-
----
-
-## 📂 Scripts in this repo
-
-- `tempocut_v2.py` – the GUI application
-- `audio_skippy_SURROUND.py` – joint audio+video redundancy detection and audio time compression, multichannel/5.1
-- `time_compressor_CUTLIST.py` – exact cut-based video compression with subframe blending at cut points
-- `subtitle_retime.py` – retimes SRTs via the exact cut map
-- `tempocut.spec` / `TempoCut.iss` – build files for the installer
+- `--target-ratio` ≈ total shortening (e.g., `1.02` ≈ 2% shorter)
+- `--video` enables joint audio+video redundancy detection — cuts only land where audio is quiet *and* video is static
+- Smaller `--frame-ms` / `--cadence-ms` = tighter sync, more frequent cuts
+- Larger values = smoother, lighter compression
+- These map directly to the GUI's Gentle/Light/Balanced/Heavy/Extreme presets — see `tempocut_v2.py`'s `CompressionTab.SKIPPY_PRESETS` for exact values
 
 ---
 
-## 📜 License
+## Blend-Through Mode Notes
+
+Blend-Through reads the same cut list as Cut mode but treats each window as a "speed through" zone instead of a deletion:
+
+- `--window-blend` (0–1) controls how strongly neighboring frames are cross-blended within a window. 0 = hard frame-skip (faster playback, no blending); 1 = maximal blend.
+- `--audio-duration` should be the actual measured duration of the compressed audio output, so video duration matches it exactly. If omitted, it's estimated from the cutlist alone.
+- Windows are automatically widened (borrowing time from surrounding footage, capped per-side) when the natural redundancy found isn't enough to hit the target duration, or when a window is too short relative to the frame rate to produce a visible blend at all.
+- A short lead-in blend eases into each window from normal-speed playback, rather than a hard transition straight into the sped-up section.
+
+---
+
+## Known Issues & Workarounds
+
+- **Brief freeze at start** if the first audio/video frames are silent/black. *Workaround:* trim a tiny leading sliver (100–300 ms) before processing.
+- **Blend-Through with very tight Skippy presets** (e.g. Gentle on long, low-redundancy content) may print a warning if even maximal window-widening can't fully close the gap to the target duration — in that case, use a less aggressive preset or switch to Cut mode for that job.
+
+---
+
+## Scripts in this repo
+
+- `tempocut_v2.py` — full PyQt5 GUI
+- `audio_skippy_SURROUND.py` — joint audio+video redundancy detection, multichannel/5.1-aware (also handles stereo/mono)
+- `time_compressor_CUTLIST.py` — Cut mode video compressor
+- `time_compressor_BLENDTHROUGH.py` — Blend-Through mode video compressor
+- `subtitle_retime.py` — retimes SRT/STL/SCC subtitles via the saved warp map
+- `tempocut.spec` — PyInstaller build spec
+- `TempoCut.iss` — Inno Setup installer script
+
+---
+
+## License
 
 MIT License — see [LICENSE](LICENSE) for details.
